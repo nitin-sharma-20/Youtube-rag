@@ -1,0 +1,11 @@
+youtube-transcript-api
+langchain
+langchain-community
+python-dotenv
+sentence-transformers
+chromadb
+google-generativeai
+fastapi
+uvicorn
+pydantic
+streamlit
