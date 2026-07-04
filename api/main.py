@@ -1,0 +1,97 @@
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
+# Import the pipeline tools 
+from app.ingest import extract_video_id, get_transcript_chunks
+from app.embed_store import build_index
+from app.router_agent import route_question
+from app.retriever import search_transcript
+from app.qa_chain import generate_answer
+
+# Initialize the API
+app = FastAPI(title="TubeRAG API", description="YouTube Video Knowledge Engine")
+
+# ---------------------------------------------------------
+# Pydantic Models (Strict Data Validation for Inputs/Outputs)
+# ---------------------------------------------------------
+class IngestRequest(BaseModel):
+    url: str
+
+class IngestResponse(BaseModel):
+    video_id: str
+    message: str
+    chunks_processed: int
+
+class QueryRequest(BaseModel):
+    video_id: str
+    query: str
+
+class QueryResponse(BaseModel):
+    answer: str
+    classification: str
+
+# ---------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------
+
+@app.post("/ingest", response_model=IngestResponse)
+def ingest_video(request: IngestRequest):
+    """Takes a YouTube URL, chunks it, and saves it to the vector database."""
+    try:
+        # Stage 1: Get Chunks
+        vid_id = extract_video_id(request.url)
+        chunks = get_transcript_chunks(request.url)
+        
+        if not chunks:
+            raise HTTPException(status_code=400, detail="Could not get transcript. Captions may be disabled.")
+            
+        # Stage 2: Embed and Store
+        build_index(chunks, vid_id)
+        
+        return IngestResponse(
+            video_id=vid_id, 
+            message="Successfully ingested and embedded video.",
+            chunks_processed=len(chunks)
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/query", response_model=QueryResponse)
+def query_video(request: QueryRequest):
+    """Takes a video ID and a question, routes it, and generates an answer."""
+    try:
+        # Stage 5: Agent Classification
+        category = route_question(request.query)
+        
+        if category == "VAGUE":
+            return QueryResponse(
+                answer="Your question is too vague. Can you be more specific?",
+                classification=category
+            )
+        elif category == "OUT_OF_SCOPE":
+            return QueryResponse(
+                answer="This question seems unrelated to the video's content.",
+                classification=category
+            )
+            
+        # Stage 3: Retrieval (Only runs if ANSWERABLE)
+        # Note: We use top_k=3 to keep it fast and focused
+        chunks = search_transcript(request.video_id, request.query, top_k=3)
+        if not chunks:
+            return QueryResponse(
+                answer="I couldn't find any relevant information in this video.",
+                classification=category
+            )
+            
+        # Stage 4: Generate Final Answer
+        final_answer = generate_answer(request.query, chunks)
+        
+        return QueryResponse(
+            answer=final_answer,
+            classification=category
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

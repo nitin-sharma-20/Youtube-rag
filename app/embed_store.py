@@ -74,7 +74,7 @@ def load_index(video_id: str):
 # 3. Standalone Testing Block
 # ---------------------------------------------------------
 if __name__ == "__main__":
-    from ingest import get_transcript_chunks, extract_video_id
+    from app.ingest import get_transcript_chunks, extract_video_id
     
     test_url = "https://www.youtube.com/watch?v=sVcwVQRHIc8" # 40 min LangChain tutorial
     vid_id = extract_video_id(test_url)
