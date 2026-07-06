@@ -1,12 +1,13 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-
+import time
 # Import the pipeline tools 
 from app.ingest import extract_video_id, get_transcript_chunks
 from app.embed_store import build_index
 from app.router_agent import route_question
 from app.retriever import search_transcript
 from app.qa_chain import generate_answer
+from app.embed_store import build_index, load_index
 
 # Initialize the API
 app = FastAPI(title="TubeRAG API", description="YouTube Video Knowledge Engine")
@@ -38,8 +39,18 @@ class QueryResponse(BaseModel):
 def ingest_video(request: IngestRequest):
     """Takes a YouTube URL, chunks it, and saves it to the vector database."""
     try:
-        # Stage 1: Get Chunks
         vid_id = extract_video_id(request.url)
+        
+        # SMART FIX: Check if we ALREADY processed this video in the database
+        existing_collection = load_index(vid_id)
+        if existing_collection and existing_collection.count() > 0:
+            return IngestResponse(
+                video_id=vid_id, 
+                message="Video already exists in database. Skipped YouTube download.",
+                chunks_processed=existing_collection.count()
+            )
+
+        # If it's a new video, proceed to Stage 1: Get Chunks from YouTube
         chunks = get_transcript_chunks(request.url)
         
         if not chunks:
@@ -57,10 +68,11 @@ def ingest_video(request: IngestRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.post("/query", response_model=QueryResponse)
 def query_video(request: QueryRequest):
     """Takes a video ID and a question, routes it, and generates an answer."""
+
+    start_time = time.time()
     try:
         # Stage 5: Agent Classification
         category = route_question(request.query)
@@ -87,6 +99,9 @@ def query_video(request: QueryRequest):
             
         # Stage 4: Generate Final Answer
         final_answer = generate_answer(request.query, chunks)
+        end_time = time.time() # Stop the stopwatch!
+        total_seconds = end_time - start_time
+        print(f"Total API Response Time: {total_seconds:.2f} seconds")
         
         return QueryResponse(
             answer=final_answer,
@@ -95,3 +110,10 @@ def query_video(request: QueryRequest):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+    
+    
+
+    
+    
+    

@@ -44,7 +44,7 @@ USER QUESTION:
 
     # 3. Call Gemini using the new modern SDK
     response = client.models.generate_content(
-        model='gemini-3.5-flash',
+        model='gemini-2.5-flash',
         contents=prompt
     )
     return response.text
