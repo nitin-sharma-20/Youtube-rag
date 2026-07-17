@@ -4,8 +4,7 @@ langchain-community
 python-dotenv
 sentence-transformers
 chromadb
-google-generativeai
+google-genai
 fastapi
 uvicorn
 pydantic
-streamlit

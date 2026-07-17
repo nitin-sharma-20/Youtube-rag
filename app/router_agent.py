@@ -1,19 +1,18 @@
 import os
-from google import genai
+from groq import Groq
 from dotenv import load_dotenv
 
 load_dotenv()
-api_key = os.getenv("GEMINI_API_KEY")
+api_key = os.getenv("GROQ_API_KEY")
 
 if not api_key:
-    raise ValueError("GEMINI_API_KEY is not set in the .env file!")
+    raise ValueError("GROQ_API_KEY is not set in the .env file!")
 
-client = genai.Client(api_key=api_key)
+client = Groq(api_key=api_key)
 
 def route_question(query: str) -> str:
     """
-    Acts as an intelligent router. Classifies the user's question before we 
-    waste time searching the database.
+    Acts as an intelligent router using Llama 3. Classifies the user's question.
     """
     prompt = f"""
 You are an intelligent routing agent for a YouTube video Q&A system.
@@ -28,40 +27,22 @@ Output ONLY the exact category name (ANSWERABLE, VAGUE, or OUT_OF_SCOPE). Do not
 USER QUESTION: {query}
 """
     
-    response = client.models.generate_content(
-        model='gemini-3.5-flash',
-        contents=prompt
+    completion = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.0
     )
     
-    # Clean the response to ensure we just get the raw word
-    category = response.text.strip().upper()
+    category = completion.choices[0].message.content.strip().upper()
     
-    # Safety fallback: if the AI accidentally outputs weird text, default to trying to answer it
     if category not in ["ANSWERABLE", "VAGUE", "OUT_OF_SCOPE"]:
         category = "ANSWERABLE" 
         
     return category
 
-# ---------------------------------------------------------
-# Standalone Testing Block
-# ---------------------------------------------------------
+# --- Testing Block ---
 if __name__ == "__main__":
-    
-    test_queries = [
-        "Where does Lance Martin work?",      # Should route to ANSWERABLE
-        "What is it?",                        # Should route to VAGUE
-        "What is the capital of France?"      # Should route to OUT_OF_SCOPE
-    ]
-    
+    test_queries = ["Where does Lance Martin work?", "What is it?", "What is the capital of France?"]
     for q in test_queries:
         print(f"\nQuestion: {q}")
-        classification = route_question(q)
-        print(f"Agent Decision: {classification}")
-        
-        # This simulates the logic we will use in your FastAPI app tomorrow
-        if classification == "ANSWERABLE":
-            print("-> Action: Proceeding to ChromaDB search...")
-        elif classification == "VAGUE":
-            print("-> Action: Skipping DB. Asking user to be more specific.")
-        elif classification == "OUT_OF_SCOPE":
-            print("-> Action: Skipping DB. Telling user this is unrelated to the video.")
+        print(f"Agent Decision: {route_question(q)}")
