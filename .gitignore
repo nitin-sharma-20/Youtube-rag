@@ -3,3 +3,5 @@ __pycache__/
 .env
 data/chroma_db/
 fetched.txt
+frontend/node_modules/
+frontend/dist/

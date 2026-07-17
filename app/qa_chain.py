@@ -1,25 +1,25 @@
 import os
 from typing import List, Dict, Any
 from dotenv import load_dotenv
-from google import genai
+from groq import Groq
 
 # Load the API key from the .env file
 load_dotenv()
-api_key = os.getenv("GEMINI_API_KEY")
+api_key = os.getenv("GROQ_API_KEY")
 
 if not api_key:
-    raise ValueError("GEMINI_API_KEY is not set in the .env file!")
+    raise ValueError("GROQ_API_KEY is not set in the .env file!")
 
-# Initialize the modern Gemini client
-client = genai.Client(api_key=api_key)
+# Initialize the Groq client
+client = Groq(api_key=api_key)
 
 def generate_answer(query: str, retrieved_chunks: List[Dict[str, Any]]) -> str:
     """
     Takes the user's question and the chunks we found in the database,
-    and asks Gemini to construct a final answer.
+    and asks Llama 3 (via Groq) to construct a final answer.
     """
     
-    # 1. Format the chunks into a readable text block for Gemini
+    # 1. Format the chunks into a readable text block
     context_text = ""
     for i, chunk in enumerate(retrieved_chunks):
         timestamp = chunk["start_time"]
@@ -42,16 +42,17 @@ USER QUESTION:
 {query}
 """
 
-    # 3. Call Gemini using the new modern SDK
-    response = client.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=prompt
+    # 3. Call Groq using the open-source Llama 3 model
+    completion = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.0 # Set to 0 so it doesn't get "creative" and hallucinate
     )
-    return response.text
+    return completion.choices[0].message.content
 
-# ---------------------------------------------------------
-# Standalone Testing Block
-# ---------------------------------------------------------
+# --- Testing Block ---
 if __name__ == "__main__":
     from app.retriever import search_transcript
     from app.ingest import extract_video_id
@@ -59,16 +60,8 @@ if __name__ == "__main__":
     test_url = "https://www.youtube.com/watch?v=sVcwVQRHIc8"
     vid_id = extract_video_id(test_url)
     
-    # Test 1: In-video question (Should give a cited answer)
     q1 = "Where does Lance Martin work?"
     print(f"\n[Test 1] Question: {q1}")
     chunks1 = search_transcript(vid_id, q1, top_k=3)
     answer1 = generate_answer(q1, chunks1)
     print(f"ANSWER:\n{answer1}\n")
-    
-    # Test 2: Out-of-scope question (The hallucination test)
-    q2 = "What is the capital of France?"
-    print(f"\n[Test 2] Question: {q2}")
-    chunks2 = search_transcript(vid_id, q2, top_k=3)
-    answer2 = generate_answer(q2, chunks2)
-    print(f"ANSWER:\n{answer2}\n")

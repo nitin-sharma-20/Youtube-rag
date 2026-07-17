@@ -1,16 +1,27 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import time
 # Import the pipeline tools 
 from app.ingest import extract_video_id, get_transcript_chunks
-from app.embed_store import build_index
+from app.embed_store import build_index, load_index
 from app.router_agent import route_question
 from app.retriever import search_transcript
 from app.qa_chain import generate_answer
-from app.embed_store import build_index, load_index
 
 # Initialize the API
 app = FastAPI(title="TubeRAG API", description="YouTube Video Knowledge Engine")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ---------------------------------------------------------
 # Pydantic Models (Strict Data Validation for Inputs/Outputs)
