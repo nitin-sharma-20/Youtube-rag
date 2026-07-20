@@ -1,26 +1,23 @@
-import re
+import os
 from typing import List, Dict, Any
-from youtube_transcript_api import YouTubeTranscriptApi
-from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFound
+from dotenv import load_dotenv
+from supadata import Supadata
+
+# Load the API key from .env
+load_dotenv()
 
 def extract_video_id(url: str) -> str:
     """Extracts the YouTube video ID using simple string splitting."""
     
     # 1. Handle short mobile links (like https://youtu.be/sVcwVQRHIc8)
     if "youtu.be/" in url:
-        # Cut the string in half at "youtu.be/" and keep the right side (index 1)
         right_side = url.split("youtu.be/")[1]
-        
-        # If there's extra stuff at the end (like ?t=50s), cut at the "?" and keep the left side (index 0)
         clean_id = right_side.split("?")[0]
         return clean_id
         
-    # 2. Handle standard desktop links (like https://www.youtube.com/watch?v=sVcwVQRHIc8&t=2111s)
+    # 2. Handle standard desktop links (like https://www.youtube.com/watch?v=sVcwVQRHIc8)
     elif "v=" in url:
-        # Cut the string in half at "v=" and keep the right side
         right_side = url.split("v=")[1]
-        
-        # If there's extra stuff at the end (like &t=2111s), cut at the "&" and keep the left side
         clean_id = right_side.split("&")[0]
         return clean_id
         
@@ -30,33 +27,43 @@ def extract_video_id(url: str) -> str:
 
 def get_transcript_chunks(url: str, chunk_size: int = 500) -> List[Dict[str, Any]]:
     """
-    Fetches transcript and chunks it into ~500 character blocks,
-    preserving the earliest timestamp for each chunk.
+    Fetches transcript using the official Supadata SDK to bypass YouTube rate limits,
+    and chunks it into ~500 character blocks, preserving the earliest timestamp.
     """
     video_id = extract_video_id(url)
+    api_key = os.getenv("SUPADATA_API_KEY")
+    
+    if not api_key:
+        print("Error: SUPADATA_API_KEY is not set in your .env file!")
+        return []
     
     try:
-        # Fetch the transcript (defaults to English if available)
-        api = YouTubeTranscriptApi()
-        transcript = api.fetch(video_id)
-    except (TranscriptsDisabled, NoTranscriptFound) as e:
-        # Handle the failure case gracefully!
-        print(f"Error: Captions are disabled or not found for video {url}")
-        return []
+        print(f"Fetching transcript for {video_id} via Supadata SDK...")
+        
+        # Initialize the official SDK client
+        client = Supadata(api_key=api_key)
+        
+        # Use the new unified transcript method, passing the full URL directly
+        transcript_response = client.transcript(url=url) 
+        
+        # The SDK returns the segments inside the .content attribute
+        transcript_data = transcript_response.content
+        
     except Exception as e:
-        print(f"Error fetching transcript: {str(e)}")
+        print(f"Error fetching transcript from Supadata: {str(e)}")
         return []
 
     chunks = []
     current_chunk_text = ""
     current_chunk_start = None
-    
-    # with open("fetched.txt", "w", encoding="utf-8") as file:
-    #     file.write(str(transcript))
 
-    for entry in transcript:
-        text = entry.text.replace('\n', ' ').strip()
-        start = entry.start    
+    for entry in transcript_data:
+        # Use getattr() to safely extract the text and timestamp from the Python object
+        text = getattr(entry, 'text', '').replace('\n', ' ').strip()
+        start = getattr(entry, 'start', getattr(entry, 'offset', 0))
+
+        if not text:
+            continue
 
         # If this is the start of a new chunk, record the timestamp
         if current_chunk_start is None:
@@ -90,7 +97,7 @@ def get_transcript_chunks(url: str, chunk_size: int = 500) -> List[Dict[str, Any
 if __name__ == "__main__":
     # Test cases defined in your plan
     test_urls = [
-        "https://www.youtube.com/watch?v=ZpF6IE0rdxA"
+        "https://www.youtube.com/watch?v=sVcwVQRHIc8"
     ]
 
     for url in test_urls:
@@ -102,8 +109,7 @@ if __name__ == "__main__":
                 continue
             
             # Print the first 2 chunks to verify
-            
-            print(f"Successfully created {len(chunks)} chunks.")
+            print(f"Successfully created {len(chunks)} chunks using Supadata!")
             for i, chunk in enumerate(chunks[:2]):
                 print(f"Chunk {i+1} [Start: {chunk['metadata']['start_time']:.2f}s]:")
                 print(f"{chunk['text']}\n")
