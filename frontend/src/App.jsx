@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { ingestVideo, queryVideo } from './api'
 import './App.css'
 
@@ -19,6 +19,11 @@ function App() {
   const [isIngesting, setIsIngesting] = useState(false)
   const [isQuerying, setIsQuerying] = useState(false)
   const [queryError, setQueryError] = useState(null)
+  const chatBottomRef = useRef(null)
+
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatHistory, isQuerying])
 
   async function handleIngest(event) {
     event.preventDefault()
@@ -35,7 +40,7 @@ function App() {
       const data = await ingestVideo(youtubeUrl.trim())
       setVideoId(data.video_id)
       setChatHistory([])
-      setIngestStatus(`Success! Embedded ${data.chunks_processed} chunks.`)
+      setIngestStatus(`Embedded ${data.chunks_processed} chunks.`)
     } catch (error) {
       setIngestError(
         error instanceof TypeError
@@ -72,88 +77,141 @@ function App() {
     }
   }
 
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      handleQuery(e)
+    }
+  }
+
   return (
     <div className="app">
-      <aside className="sidebar">
-        <h2>1. Load Video</h2>
-        <form className="ingest-form" onSubmit={handleIngest}>
-          <label htmlFor="youtube-url">YouTube URL</label>
-          <input
-            id="youtube-url"
-            type="url"
-            placeholder="https://www.youtube.com/watch?v=..."
-            value={youtubeUrl}
-            onChange={(event) => setYoutubeUrl(event.target.value)}
-            disabled={isIngesting}
-          />
-          <button type="submit" disabled={isIngesting}>
-            {isIngesting ? 'Processing...' : 'Process Video'}
-          </button>
+      {/* ── TOP NAVBAR ── */}
+      <nav className="navbar">
+        <div className="navbar-brand">
+            <span className="brand-name">TubeRAG</span>
+        </div>
+        {videoId && (
+          <div className="navbar-vid-badge">
+            <span className="vid-dot" />
+            <span className="vid-label">LIVE: {videoId}</span>
+          </div>
+        )}
+      </nav>
+
+      {/* ── HERO SECTION ── */}
+      <section className="hero">
+        <h1 className="hero-title">Chat with any<br />YouTube video</h1>
+        <p className="hero-subtitle">
+          Paste a video link · process the transcript · ask anything
+        </p>
+
+        {/* URL input row */}
+        <form className="url-form" onSubmit={handleIngest} id="ingest-form">
+          <div className="url-input-wrap">
+            <span className="url-icon">🔗</span>
+            <input
+              id="youtube-url"
+              type="url"
+              className="url-input"
+              placeholder="https://www.youtube.com/watch?v=..."
+              value={youtubeUrl}
+              onChange={(e) => setYoutubeUrl(e.target.value)}
+              disabled={isIngesting}
+              aria-label="YouTube URL"
+            />
+            <button
+              type="submit"
+              className="url-submit"
+              disabled={isIngesting}
+              aria-label="Process video"
+            >
+              {isIngesting ? (
+                <span className="spin-icon">⟳</span>
+              ) : (
+                <span>↑</span>
+              )}
+            </button>
+          </div>
         </form>
 
+        {/* Status messages under input */}
         {isIngesting && (
           <p className="status status-loading">
-            Processing transcript and generating embeddings. This may take a minute.
+            ▌ Processing transcript &amp; generating embeddings…
           </p>
         )}
-        {ingestStatus && <p className="status status-success">{ingestStatus}</p>}
-        {ingestError && <p className="status status-error">{ingestError}</p>}
-      </aside>
+        {ingestStatus && (
+          <p className="status status-success">✔ {ingestStatus}</p>
+        )}
+        {ingestError && (
+          <p className="status status-error">✖ {ingestError}</p>
+        )}
+      </section>
 
-      <main className="main">
-        <header className="hero">
-          <h1>TubeRAG: YouTube Knowledge Engine</h1>
-          <p>Ask questions about any YouTube video using RAG.</p>
-        </header>
-
+      {/* ── CHAT SECTION ── */}
+      <section className="chat-section">
         {!videoId ? (
           <div className="empty-state">
-            Paste a YouTube URL in the sidebar to get started.
+            <div className="empty-icon">▶</div>
+            <p>Paste a YouTube URL above to get started.</p>
           </div>
         ) : (
-          <section className="chat-section">
-            <div className="chat-header">
-              <h2>2. Ask Questions</h2>
-              <p className="video-id">Currently chatting with video ID: {videoId}</p>
-            </div>
-
-            <div className="chat-history">
+          <div className="chat-container">
+            <div className="chat-history" id="chat-history">
               {chatHistory.length === 0 && (
                 <p className="chat-placeholder">
-                  Ask a specific question about this video.
+                  Ask a specific question about this video…
                 </p>
               )}
               {chatHistory.map((message, index) => (
-                <div key={`${message.role}-${index}`} className={`message message-${message.role}`}>
-                  <span className="message-role">{message.role === 'user' ? 'You' : 'Assistant'}</span>
+                <div
+                  key={`${message.role}-${index}`}
+                  className={`message message-${message.role}`}
+                >
+                  <span className="message-role">
+                    {message.role === 'user' ? '[ YOU ]' : '[ AI ]'}
+                  </span>
                   <div className="message-content">{message.content}</div>
                 </div>
               ))}
               {isQuerying && (
                 <div className="message message-assistant">
-                  <span className="message-role">Assistant</span>
-                  <div className="message-content thinking">Thinking...</div>
+                  <span className="message-role">[ AI ]</span>
+                  <div className="message-content thinking">
+                    <span className="blink">█</span> Thinking…
+                  </div>
                 </div>
               )}
+              {queryError && (
+                <p className="status status-error">✖ {queryError}</p>
+              )}
+              <div ref={chatBottomRef} />
             </div>
 
-            {queryError && <p className="status status-error">{queryError}</p>}
-
-            <form className="chat-form" onSubmit={handleQuery}>
+            {/* Chat input row */}
+            <form className="chat-form" onSubmit={handleQuery} id="chat-form">
               <input
                 type="text"
-                placeholder="Ask a specific question about this video..."
+                className="chat-input"
+                placeholder="Ask a specific question about this video…"
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
                 disabled={isQuerying}
+                aria-label="Your question"
               />
-              <button type="submit" disabled={isQuerying || !query.trim()}>
-                Send
+              <button
+                type="submit"
+                className="chat-submit"
+                disabled={isQuerying || !query.trim()}
+                aria-label="Send message"
+              >
+                SEND ↵
               </button>
             </form>
-          </section>
+          </div>
         )}
-      </main>
+      </section>
     </div>
   )
 }
