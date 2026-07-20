@@ -7,7 +7,7 @@ from app.ingest import extract_video_id, get_transcript_chunks
 from app.embed_store import build_index, load_index
 from app.router_agent import route_question
 from app.retriever import search_transcript
-from app.qa_chain import generate_answer
+from app.qa_chain import generate_answer, generate_out_of_scope_answer
 
 # Initialize the API
 app = FastAPI(title="TubeRAG API", description="YouTube Video Knowledge Engine")
@@ -94,8 +94,9 @@ def query_video(request: QueryRequest):
                 classification=category
             )
         elif category == "OUT_OF_SCOPE":
+            answer = generate_out_of_scope_answer(request.query)
             return QueryResponse(
-                answer="This question seems unrelated to the video's content.",
+                answer=answer,
                 classification=category
             )
             

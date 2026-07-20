@@ -18,9 +18,9 @@ def route_question(query: str) -> str:
 You are an intelligent routing agent for a YouTube video Q&A system.
 Your job is to analyze the user's question and classify it into exactly ONE of the following three categories:
 
-1. ANSWERABLE: The question is specific and likely to be answered by the contents of a technical video, tutorial, or lecture.
-2. VAGUE: The question is too short or lacks context to search a database effectively (e.g., "what is it?", "tell me more", "why?").
-3. OUT_OF_SCOPE: The question is a general knowledge question clearly unrelated to a specific video's content (e.g., "what is the capital of France?", "write a poem").
+1. ANSWERABLE: The question can be answered using the content of a video. This includes specific questions, broad overview questions, and summary requests such as "summarize the video", "give me an overview", "what is this video about?", "what are the main topics?", or "what does the speaker talk about?".
+2. VAGUE: The question is so context-free that it is impossible to search a database meaningfully. Examples: "what is it?", "tell me more", "why?", "explain" (with no subject). A question is only VAGUE if it has no discernible subject or intent.
+3. OUT_OF_SCOPE: The question is clearly a general knowledge question unrelated to any video content (e.g., "what is the capital of France?", "write me a poem", "what is 2+2?").
 
 Output ONLY the exact category name (ANSWERABLE, VAGUE, or OUT_OF_SCOPE). Do not output any other text or punctuation.
 

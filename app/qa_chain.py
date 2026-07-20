@@ -52,6 +52,29 @@ USER QUESTION:
     )
     return completion.choices[0].message.content
 
+def generate_out_of_scope_answer(query: str) -> str:
+    """
+    Answers a question using general world knowledge, but explicitly
+    informs the user that this topic is not covered in the video.
+    """
+    prompt = f"""
+You are a helpful assistant. The user is asking a question that is NOT covered in the YouTube video they are watching.
+
+INSTRUCTIONS:
+1. Start your response with a clear disclaimer, for example: "This topic isn't covered in the video, but here's what I know:"
+2. Then answer the question using your general knowledge.
+3. Keep the answer concise and accurate.
+
+USER QUESTION:
+{query}
+"""
+    completion = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3
+    )
+    return completion.choices[0].message.content
+
 # --- Testing Block ---
 if __name__ == "__main__":
     from app.retriever import search_transcript
