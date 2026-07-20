@@ -88,14 +88,9 @@ function App() {
       {/* ── TOP NAVBAR ── */}
       <nav className="navbar">
         <div className="navbar-brand">
-            <span className="brand-name">TubeRAG</span>
+          <span className="brand-name">TubeRAG</span>
         </div>
-        {videoId && (
-          <div className="navbar-vid-badge">
-            <span className="vid-dot" />
-            <span className="vid-label">LIVE: {videoId}</span>
-          </div>
-        )}
+
       </nav>
 
       {/* ── HERO SECTION ── */}
